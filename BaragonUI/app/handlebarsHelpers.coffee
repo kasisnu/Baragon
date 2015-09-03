@@ -34,10 +34,15 @@ Handlebars.registerHelper 'iconForLBState', (state) ->
         else 'glyphicon glyphicon-question-sign'
 
 Handlebars.registerHelper 'workerLagHumanize', (lag) ->
-    if parseInt(lag) > 1000000
+    lagInMs = parseInt(lag)
+    if lagInMs > 1000000
         return 'Not Running'
     else
-        return "#{lag} ms"
+        if lagInMs > 10000
+            lagInSeconds = lagInMs / 1000
+            return "#{lagInSeconds} s"
+        else
+            return "#{lagInMs} ms"
 
 Handlebars.registerHelper 'debug', (variable) ->
     console.dir(variable)
