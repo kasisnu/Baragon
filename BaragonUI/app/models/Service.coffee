@@ -20,7 +20,7 @@ class Service extends Model
         data.id = data.service.serviceId
         data.splitLbGroups = utils.splitArray(data.service.loadBalancerGroups.sort(), Math.ceil(data.service.loadBalancerGroups.length/2))
         data.splitOwners = utils.splitArray(data.service.owners.sort(), Math.ceil(data.service.owners.length/2))
-        data.splitUpstreams = utils.splitArray(data.upstreams, Math.ceil(data.upstreams.length/3))
+        data.splitUpstreams = utils.splitArray(data.upstreams, Math.ceil(data.upstreams.length/2))
         data.upstreamsCount = data.upstreams.length
         if data.upstreamsCount > 0
             data.active = true
