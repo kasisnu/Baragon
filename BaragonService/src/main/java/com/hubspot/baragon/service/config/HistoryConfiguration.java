@@ -16,9 +16,6 @@ public class HistoryConfiguration {
   @JsonProperty("purgeOldRequests")
   boolean purgeOldRequests = false;
 
-  @JsonProperty("keepMostRecentRequestForService")
-  boolean keepMostRecentRequestForService = true;
-
   @JsonProperty("purgeOldRequestsAfterDays")
   @Min(1)
   int purgeOldRequestsAfterDays = 30;
@@ -52,14 +49,6 @@ public class HistoryConfiguration {
 
   public void setPurgeOldRequests(boolean purgeOldRequests) {
     this.purgeOldRequests = purgeOldRequests;
-  }
-
-  public boolean isKeepMostRecentRequestForService() {
-    return keepMostRecentRequestForService;
-  }
-
-  public void setKeepMostRecentRequestForService(boolean keepMostRecentRequestForService) {
-    this.keepMostRecentRequestForService = keepMostRecentRequestForService;
   }
 
   public int getPurgeOldRequestsAfterDays() {
