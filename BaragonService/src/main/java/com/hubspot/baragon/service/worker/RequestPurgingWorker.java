@@ -83,7 +83,7 @@ public class RequestPurgingWorker implements Runnable {
     Optional<Long> maybeUpdatedAt = requestDatastore.getRequestUpdatedAt(requestId);
     if (!maybeState.isPresent() || InternalStatesMap.isRemovable(maybeState.get())) {
       if (configuration.getHistoryConfiguration().isPurgeOldRequests()) {
-        if ((maybeUpdatedAt.isPresent() && maybeUpdatedAt.get() < referenceTime) || (!maybeUpdatedAt.isPresent() && configuration.getHistoryConfiguration().isPurgeWhenDateNotFound())) {
+        if (shouldPurge(maybeUpdatedAt, referenceTime)) {
           LOG.trace(String.format("Updated at time: %s is earlier than reference time: %s, purging request %s", maybeUpdatedAt.get(), referenceTime, requestId));
           return PurgeAction.PURGE;
         } else {
@@ -104,7 +104,7 @@ public class RequestPurgingWorker implements Runnable {
         if (!requestIds.isEmpty()) {
           for (String requestId : requestIds) {
             Optional<Long> maybeUpdatedAt = responseHistoryDatastore.getRequestUpdatedAt(serviceId, requestId);
-            if ((maybeUpdatedAt.isPresent() && maybeUpdatedAt.get() < referenceTime) || (!maybeUpdatedAt.isPresent() && configuration.getHistoryConfiguration().isPurgeWhenDateNotFound())) {
+            if (shouldPurge(maybeUpdatedAt, referenceTime)) {
               LOG.trace(String.format("Updated at time: %s is earlier than reference time: %s, purging request %s", maybeUpdatedAt.get(), referenceTime, requestId));
               responseHistoryDatastore.deleteResponse(serviceId, requestId);
             }
@@ -114,5 +114,9 @@ public class RequestPurgingWorker implements Runnable {
         responseHistoryDatastore.deleteResponses(serviceId);
       }
     }
+  }
+
+  private boolean shouldPurge(Optional<Long> maybeUpdatedAt, long referenceTime) {
+    return (maybeUpdatedAt.isPresent() && maybeUpdatedAt.get() < referenceTime) || (!maybeUpdatedAt.isPresent() && configuration.getHistoryConfiguration().isPurgeWhenDateNotFound());
   }
 }
