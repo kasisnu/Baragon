@@ -99,19 +99,21 @@ public class RequestPurgingWorker implements Runnable {
 
   private void purgeHistoricalRequests(long referenceTime) {
     for (String serviceId : responseHistoryDatastore.getServiceIds()) {
-      List<String> requestIds = responseHistoryDatastore.getRequestIdsForService(serviceId);
-      if (stateDatastore.serviceExists(serviceId)) {
-        if (!requestIds.isEmpty()) {
-          for (String requestId : requestIds) {
-            Optional<Long> maybeUpdatedAt = responseHistoryDatastore.getRequestUpdatedAt(serviceId, requestId);
-            if (shouldPurge(maybeUpdatedAt, referenceTime)) {
-              LOG.trace(String.format("Updated at time: %s is earlier than reference time: %s, purging request %s", maybeUpdatedAt.get(), referenceTime, requestId));
-              responseHistoryDatastore.deleteResponse(serviceId, requestId);
+      if (!serviceId.equals("requestIdMapping")) {
+        List<String> requestIds = responseHistoryDatastore.getRequestIdsForService(serviceId);
+        if (stateDatastore.serviceExists(serviceId)) {
+          if (!requestIds.isEmpty()) {
+            for (String requestId : requestIds) {
+              Optional<Long> maybeUpdatedAt = responseHistoryDatastore.getRequestUpdatedAt(serviceId, requestId);
+              if (shouldPurge(maybeUpdatedAt, referenceTime)) {
+                LOG.trace(String.format("Updated at time: %s is earlier than reference time: %s, purging request %s", maybeUpdatedAt.get(), referenceTime, requestId));
+                responseHistoryDatastore.deleteResponse(serviceId, requestId);
+              }
             }
           }
+        } else {
+          responseHistoryDatastore.deleteResponses(serviceId);
         }
-      } else {
-        responseHistoryDatastore.deleteResponses(serviceId);
       }
     }
   }
