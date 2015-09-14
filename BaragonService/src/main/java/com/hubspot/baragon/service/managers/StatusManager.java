@@ -18,9 +18,13 @@ import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.Response;
 import org.apache.curator.framework.recipes.leader.LeaderLatch;
 import org.apache.curator.framework.state.ConnectionState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Singleton
 public class StatusManager {
+  private static final Logger LOG = LoggerFactory.getLogger(StatusManager.class);
+
   private final BaragonRequestDatastore requestDatastore;
   private final BaragonStateDatastore stateDatastore;
   private final LeaderLatch leaderLatch;
@@ -70,15 +74,11 @@ public class StatusManager {
       return getServiceStatus();
     } else {
       try {
-        Optional<String> maybeLeaderUri = workerDatastore.getBaseUri(leaderLatch.getLeader().getId());
-        if (maybeLeaderUri.isPresent()) {
-          Response response = httpClient.prepareGet(String.format("%s/status", maybeLeaderUri.get())).execute().get();
-          return objectMapper.readValue(response.getResponseBody(), BaragonServiceStatus.class);
-
-        } else {
-          return getServiceStatus();
-        }
+        String leaderUri = leaderLatch.getLeader().getId();
+        Response response = httpClient.prepareGet(String.format("%s/status", leaderUri)).execute().get();
+        return objectMapper.readValue(response.getResponseBody(), BaragonServiceStatus.class);
       } catch (Exception e) {
+        LOG.error("Error fetching status from leader", e);
         return getServiceStatus();
       }
     }
