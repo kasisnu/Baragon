@@ -93,6 +93,9 @@ public class BaragonAgentConfiguration extends Configuration {
   @JsonProperty("configCheckIntervalSecs")
   private int configCheckIntervalSecs = 60;
 
+  @JsonProperty("saveFailedConfigs")
+  private boolean saveFailedConfigs = false;
+
   public HttpClientConfiguration getHttpClientConfiguration() {
     return httpClientConfiguration;
   }
@@ -247,5 +250,13 @@ public class BaragonAgentConfiguration extends Configuration {
 
   public void setConfigCheckIntervalSecs(int configCheckIntervalSecs) {
     this.configCheckIntervalSecs = configCheckIntervalSecs;
+  }
+
+  public boolean isSaveFailedConfigs() {
+    return saveFailedConfigs;
+  }
+
+  public void setSaveFailedConfigs(boolean saveFailedConfigs) {
+    this.saveFailedConfigs = saveFailedConfigs;
   }
 }
