@@ -3,6 +3,7 @@ package com.hubspot.baragon.service.config;
 import javax.validation.Valid;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
+import javax.ws.rs.HEAD;
 
 import org.hibernate.validator.constraints.NotEmpty;
 
