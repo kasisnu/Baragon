@@ -81,15 +81,24 @@ public class BaragonConfiguration extends Configuration {
   @JsonProperty("defaultTargetAgentCount")
   private int defaultTargetAgentCount = 1;
 
+<<<<<<< HEAD
   @JsonProperty("graphite")
   private GraphiteConfiguration graphiteConfiguration = new GraphiteConfiguration();
 
+=======
+>>>>>>> master
   @JsonProperty
   private boolean updateStateInBackground = false;
 
   @JsonProperty
   @Min(0)
   private int backgroundStateUpdateIntervalMs = 5000;
+<<<<<<< HEAD
+=======
+
+  @JsonProperty("graphite")
+  private GraphiteConfiguration graphiteConfiguration = new GraphiteConfiguration();
+>>>>>>> master
 
   public ZooKeeperConfiguration getZooKeeperConfiguration() {
     return zooKeeperConfiguration;
@@ -211,14 +220,6 @@ public class BaragonConfiguration extends Configuration {
     this.defaultTargetAgentCount = defaultTargetAgentCount;
   }
 
-  public GraphiteConfiguration getGraphiteConfiguration() {
-    return graphiteConfiguration;
-  }
-
-  public void setGraphiteConfiguration(GraphiteConfiguration graphiteConfiguration) {
-    this.graphiteConfiguration = graphiteConfiguration;
-  }
-
   public boolean isUpdateStateInBackground() {
     return updateStateInBackground;
   }
@@ -233,5 +234,13 @@ public class BaragonConfiguration extends Configuration {
 
   public void setBackgroundStateUpdateIntervalMs(int backgroundStateUpdateIntervalMs) {
     this.backgroundStateUpdateIntervalMs = backgroundStateUpdateIntervalMs;
+  }
+
+  public GraphiteConfiguration getGraphiteConfiguration() {
+    return graphiteConfiguration;
+  }
+
+  public void setGraphiteConfiguration(GraphiteConfiguration graphiteConfiguration) {
+    this.graphiteConfiguration = graphiteConfiguration;
   }
 }
