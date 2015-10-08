@@ -81,24 +81,15 @@ public class BaragonConfiguration extends Configuration {
   @JsonProperty("defaultTargetAgentCount")
   private int defaultTargetAgentCount = 1;
 
-<<<<<<< HEAD
-  @JsonProperty("graphite")
-  private GraphiteConfiguration graphiteConfiguration = new GraphiteConfiguration();
-
-=======
->>>>>>> master
   @JsonProperty
   private boolean updateStateInBackground = false;
 
   @JsonProperty
   @Min(0)
   private int backgroundStateUpdateIntervalMs = 5000;
-<<<<<<< HEAD
-=======
 
   @JsonProperty("graphite")
   private GraphiteConfiguration graphiteConfiguration = new GraphiteConfiguration();
->>>>>>> master
 
   public ZooKeeperConfiguration getZooKeeperConfiguration() {
     return zooKeeperConfiguration;
