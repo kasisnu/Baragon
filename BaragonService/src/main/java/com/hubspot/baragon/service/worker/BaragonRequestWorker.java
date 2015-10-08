@@ -175,7 +175,6 @@ public class BaragonRequestWorker implements Runnable {
     workerLastStartAt.set(System.currentTimeMillis());
 
     try {
-
       final List<QueuedRequestId> queuedRequestIds = requestManager.getQueuedRequestIds();
 
       if (!queuedRequestIds.isEmpty()) {
@@ -190,6 +189,8 @@ public class BaragonRequestWorker implements Runnable {
           }
         }
       }
+
+      requestManager.failStuckPendingRequests();
     } catch (Exception e) {
       LOG.warn("Caught exception", e);
     }
