@@ -80,25 +80,6 @@ public class RequestManager {
     requestDatastore.removeQueuedRequest(queuedRequestId);
   }
 
-  public void failStuckPendingRequests() {
-    for (String requestId : requestDatastore.getAllRequestIds()) {
-      Optional<InternalRequestStates> maybeState = requestDatastore.getRequestState(requestId);
-      if (!maybeState.isPresent() || (maybeState.get().equals(InternalRequestStates.PENDING) && !hasQueuedRequest(requestId))) {
-        setRequestState(requestId, InternalRequestStates.FAILED_REVERTED);
-        setRequestMessage(requestId, "Request failed due to being stuck in PENDING state");
-      }
-    }
-  }
-
-  private boolean hasQueuedRequest(String requestId) {
-    for (QueuedRequestId queuedRequestId : getQueuedRequestIds()) {
-      if (queuedRequestId.getRequestId().equals(requestId)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   public List<BaragonResponse> getResponsesForService(String serviceId) {
     List<BaragonResponse> responses = new ArrayList<>();
     for (String requestId : requestDatastore.getAllRequestIds()) {
@@ -235,10 +216,7 @@ public class RequestManager {
       throw new InvalidRequestActionException("The REVERT action may only be used internally by Baragon, you may specify UPDATE, DELETE, RELOAD, or leave the action blank(UPDATE)");
     }
 
-    requestDatastore.addRequest(request);
-    requestDatastore.setRequestState(request.getLoadBalancerRequestId(), InternalRequestStates.PENDING);
-
-    final QueuedRequestId queuedRequestId = requestDatastore.enqueueRequest(request);
+    final QueuedRequestId queuedRequestId = requestDatastore.enqueueRequest(request, InternalRequestStates.PENDING);
 
     requestDatastore.setRequestMessage(request.getLoadBalancerRequestId(), String.format("Queued as %s", queuedRequestId));
 
