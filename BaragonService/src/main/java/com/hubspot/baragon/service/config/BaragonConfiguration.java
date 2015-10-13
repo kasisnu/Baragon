@@ -3,7 +3,6 @@ package com.hubspot.baragon.service.config;
 import javax.validation.Valid;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
-import javax.ws.rs.HEAD;
 
 import org.hibernate.validator.constraints.NotEmpty;
 
@@ -212,14 +211,6 @@ public class BaragonConfiguration extends Configuration {
     this.defaultTargetAgentCount = defaultTargetAgentCount;
   }
 
-  public GraphiteConfiguration getGraphiteConfiguration() {
-    return graphiteConfiguration;
-  }
-
-  public void setGraphiteConfiguration(GraphiteConfiguration graphiteConfiguration) {
-    this.graphiteConfiguration = graphiteConfiguration;
-  }
-
   public boolean isUpdateStateInBackground() {
     return updateStateInBackground;
   }
@@ -234,5 +225,13 @@ public class BaragonConfiguration extends Configuration {
 
   public void setBackgroundStateUpdateIntervalMs(int backgroundStateUpdateIntervalMs) {
     this.backgroundStateUpdateIntervalMs = backgroundStateUpdateIntervalMs;
+  }
+
+  public GraphiteConfiguration getGraphiteConfiguration() {
+    return graphiteConfiguration;
+  }
+
+  public void setGraphiteConfiguration(GraphiteConfiguration graphiteConfiguration) {
+    this.graphiteConfiguration = graphiteConfiguration;
   }
 }
