@@ -4,20 +4,27 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.services.elasticloadbalancing.AmazonElasticLoadBalancingClient;
 import com.amazonaws.services.elasticloadbalancing.model.AttachLoadBalancerToSubnetsRequest;
 import com.amazonaws.services.elasticloadbalancing.model.DeregisterInstancesFromLoadBalancerRequest;
+import com.amazonaws.services.elasticloadbalancing.model.CreateLoadBalancerListenersRequest;
 import com.amazonaws.services.elasticloadbalancing.model.DescribeInstanceHealthRequest;
 import com.amazonaws.services.elasticloadbalancing.model.DescribeInstanceHealthResult;
 import com.amazonaws.services.elasticloadbalancing.model.DescribeLoadBalancersRequest;
+import com.amazonaws.services.elasticloadbalancing.model.ListenerDescription;
+import com.amazonaws.services.elasticloadbalancing.model.DeleteLoadBalancerListenersRequest;
 import com.amazonaws.services.elasticloadbalancing.model.DescribeLoadBalancersResult;
 import com.amazonaws.services.elasticloadbalancing.model.EnableAvailabilityZonesForLoadBalancerRequest;
 import com.amazonaws.services.elasticloadbalancing.model.Instance;
 import com.amazonaws.services.elasticloadbalancing.model.InstanceState;
+import com.amazonaws.services.elasticloadbalancing.model.Listener;
 import com.amazonaws.services.elasticloadbalancing.model.LoadBalancerDescription;
+import com.amazonaws.services.elasticloadbalancing.model.ModifyLoadBalancerAttributesRequest;
 import com.amazonaws.services.elasticloadbalancing.model.RegisterInstancesWithLoadBalancerRequest;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
@@ -34,6 +41,8 @@ import com.hubspot.baragon.service.config.ElbConfiguration;
 import com.hubspot.baragon.service.exceptions.BaragonExceptionNotifier;
 import com.hubspot.baragon.service.exceptions.NoMatchingElbForVpcException;
 
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,7 +74,7 @@ public class ElbManager {
   }
 
   public boolean isActiveAndHealthy(Optional<BaragonGroup> group, BaragonAgentMetadata agent) {
-    for (String elbName : group.get().getSources()) {
+    for (String elbName : group.get().getSources().keySet()) {
       if (isHealthyInstance(agent.getEc2().getInstanceId().get(), elbName)) {
         return true;
       }
@@ -75,7 +84,7 @@ public class ElbManager {
 
   public void attemptRemoveAgent(BaragonAgentMetadata agent, Optional<BaragonGroup> group, String groupName) throws AmazonClientException {
     if (elbEnabledAgent(agent, group, groupName)) {
-      for (String elbName : group.get().getSources()) {
+      for (String elbName : group.get().getSources().keySet()) {
         Instance instance = new Instance(agent.getEc2().getInstanceId().get());
         Optional<LoadBalancerDescription> elb = elbByName(elbName);
         if (elb.isPresent()) {
@@ -97,7 +106,7 @@ public class ElbManager {
     if (elbEnabledAgent(agent, group, groupName)) {
       boolean matchingElbFound = false;
       boolean matchingElbAndVpcFound = false;
-      for (String elbName : group.get().getSources()) {
+      for (String elbName : group.get().getSources().keySet()) {
         Instance instance = new Instance(agent.getEc2().getInstanceId().get());
         Optional<LoadBalancerDescription> elb = elbByName(elbName);
         if (elb.isPresent()) {
@@ -121,7 +130,7 @@ public class ElbManager {
 
   public boolean elbEnabledAgent(BaragonAgentMetadata agent, Optional<BaragonGroup> group, String groupName) {
     if (group.isPresent()) {
-      if (!group.get().getSources().isEmpty()) {
+      if (!group.get().getSources().keySet().isEmpty()) {
         if (agent.getEc2().getInstanceId().isPresent()) {
           return true;
         } else {
@@ -155,15 +164,19 @@ public class ElbManager {
   }
 
   public void syncAll() {
-    List<LoadBalancerDescription> elbs = elbClient.describeLoadBalancers().getLoadBalancerDescriptions();
     Collection<BaragonGroup> groups = null;
     try {
+      List<LoadBalancerDescription> elbs = elbClient.describeLoadBalancers().getLoadBalancerDescriptions();
       groups = loadBalancerDatastore.getLoadBalancerGroups();
       for (BaragonGroup group : groups) {
-        if (!group.getSources().isEmpty()) {
+        if (!group.getSources().keySet().isEmpty()) {
           List<LoadBalancerDescription> elbsForGroup = getElbsForGroup(elbs, group);
           LOG.debug(String.format("Registering new instances for group %s...", group.getName()));
           registerNewInstances(elbsForGroup, group);
+          if (configuration.get().getSyncListeners()) {
+            LOG.info("Attempting to sync listeners");
+            syncListeners(elbsForGroup, group);
+          }
           if (configuration.get().isDeregisterEnabled()) {
             LOG.debug(String.format("Deregistering old instances for group %s...", group.getName()));
             deregisterOldInstances(elbsForGroup, group);
@@ -182,10 +195,112 @@ public class ElbManager {
     }
   }
 
+  private void syncListeners(List<LoadBalancerDescription> elbs, BaragonGroup group) {
+    Collection<BaragonAgentMetadata> groupAgents = loadBalancerDatastore.getAgentMetadata(group.getName());
+    Map<String, Pair<Integer, Integer>> listenersToKeep = new HashMap<String, Pair<Integer, Integer>>();
+
+    // Handle create requests
+    List<CreateLoadBalancerListenersRequest> loadBalancerListenersCreateRequests = new ArrayList<>();
+    for (BaragonAgentMetadata agent : groupAgents) {
+      for (String elbName : group.getSources().keySet()) {
+
+        List<Listener> listenersToAdd = new ArrayList<>();
+
+        if (agent.getEc2().getInstanceId().isPresent()) {
+          Integer elbPort = group.getSources().get(elbName);
+          Integer instancePort = Integer.parseInt(agent.getExtraAgentData().get("port"));
+
+          if ((elbPort == null) || (elbPort == 0)) {
+            LOG.warn(String.format("Failed to find listener port to set for %s", elbName));
+            continue;
+          }
+
+          if (instancePort == 0) {
+            LOG.warn(String.format("Failed to find agent listener port to set for %s", elbName));
+            continue;
+          }
+
+          LOG.info(String.format("Will attempt to set listener for %s with instance port %s, and elb port %d", elbName, instancePort, elbPort));
+
+          Listener listener = new Listener("TCP", elbPort, instancePort);
+          listener.setInstanceProtocol("TCP");
+
+          ListenerDescription listenerDescription = new ListenerDescription();
+          listenerDescription.setListener(listener);
+
+          Optional<LoadBalancerDescription> elb = elbByName(elbName);
+          if (elb.isPresent() && elb.get().getListenerDescriptions().contains(listenerDescription)) {
+            Pair<Integer, Integer> portMapping = new ImmutablePair<Integer, Integer>(elbPort, instancePort);
+            listenersToKeep.put(elbName, portMapping);
+            continue;
+          }
+
+          listenersToAdd.add(listener);
+        }
+
+        if (!listenersToAdd.isEmpty()) {
+          loadBalancerListenersCreateRequests.add(new CreateLoadBalancerListenersRequest(elbName, listenersToAdd));
+        }
+      }
+    }
+
+    // Remove any listeners that aren't aren't in current expected mapping
+    List<DeleteLoadBalancerListenersRequest> loadBalancerListenersDeleteRequests = new ArrayList<>();
+    for (LoadBalancerDescription elb : elbs) {
+      List<Integer> listenersToRemove = new ArrayList<>();
+
+      for (ListenerDescription listenerDescription : elb.getListenerDescriptions()) {
+        Listener listener = listenerDescription.getListener();
+        Integer elbPort = listener.getLoadBalancerPort();
+        Integer instancePort = listener.getInstancePort();
+
+        Pair portMapping = listenersToKeep.get(elb.getLoadBalancerName());
+        if (portMapping != null && portMapping.getLeft().equals(elbPort) && portMapping.getRight().equals(instancePort)) {
+          LOG.info(String.format("A listener for port mapping %d on elb port %d for %s is valid. Skipping...", instancePort, elbPort, elb.getLoadBalancerName()));
+          continue;
+        }
+        listenersToRemove.add(elbPort);
+        LOG.info(String.format("Will delete listener %d for elb %s", listener.getLoadBalancerPort(), elb.getLoadBalancerName()));
+      }
+
+      if (!listenersToRemove.isEmpty()) {
+        loadBalancerListenersDeleteRequests.add(new DeleteLoadBalancerListenersRequest(elb.getLoadBalancerName(), listenersToRemove));
+      }
+    }
+
+    if (!loadBalancerListenersDeleteRequests.isEmpty()) {
+      for (DeleteLoadBalancerListenersRequest request : loadBalancerListenersDeleteRequests) {
+        try {
+          elbClient.deleteLoadBalancerListeners(request);
+          LOG.info(String.format("Deleted stale listeners for ELB [%s]: %s", request.getLoadBalancerName(), request.getLoadBalancerPorts().toString()));
+        } catch (AmazonClientException e) {
+          LOG.error(String.format("Deletion of stale listeners from ELB %s failed", request.getLoadBalancerName()));
+          //exceptionNotifier.notify(e);
+        }
+      }
+    } else {
+      LOG.debug("No listeners to delete for elb");
+    }
+
+    if (!loadBalancerListenersCreateRequests.isEmpty()) {
+      for (CreateLoadBalancerListenersRequest request : loadBalancerListenersCreateRequests) {
+        try {
+          elbClient.createLoadBalancerListeners(request);
+          LOG.info(String.format("Creating new listeners listeners for ELB [%s]: %s", request.getLoadBalancerName(), request.getListeners().toString()));
+        } catch (AmazonClientException e) {
+          LOG.error(String.format("Creation of new listeners for ELB %s failed", request.getLoadBalancerName()));
+          //exceptionNotifier.notify(e);
+        }
+      }
+    } else {
+      LOG.debug("No new listeners to add for ELB");
+    }
+  }
+
   private List<LoadBalancerDescription> getElbsForGroup(List<LoadBalancerDescription> elbs, BaragonGroup group) {
     List<LoadBalancerDescription> elbsForGroup = new ArrayList<>();
     for (LoadBalancerDescription elb : elbs) {
-      if (group.getSources().contains(elb.getLoadBalancerName())) {
+      if (group.getSources().keySet().contains(elb.getLoadBalancerName())) {
         elbsForGroup.add(elb);
       }
     }
@@ -214,7 +329,7 @@ public class ElbManager {
     List<RegisterInstancesWithLoadBalancerRequest> requests = new ArrayList<>();
     for (BaragonAgentMetadata agent : agents) {
       try {
-        for (String elbName : group.getSources()) {
+        for (String elbName : group.getSources().keySet()) {
           if (agent.getEc2().getInstanceId().isPresent()) {
             if (shouldRegister(agent, elbName, elbs)) {
               Instance instance = new Instance(agent.getEc2().getInstanceId().get());
@@ -328,7 +443,7 @@ public class ElbManager {
     List<String> agentInstances = agentInstanceIds(agents);
     List<DeregisterInstancesFromLoadBalancerRequest> requests = new ArrayList<>();
     for (LoadBalancerDescription elb : elbs) {
-      if (group.getSources().contains(elb.getLoadBalancerName())) {
+      if (group.getSources().keySet().contains(elb.getLoadBalancerName())) {
         for (Instance instance : elb.getInstances()) {
           if (!agentInstances.contains(instance.getInstanceId()) && canDeregisterAgent(group, instance)) {
             List<Instance> instanceList = new ArrayList<>(1);

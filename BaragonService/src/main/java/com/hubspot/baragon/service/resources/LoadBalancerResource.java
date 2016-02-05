@@ -60,8 +60,8 @@ public class LoadBalancerResource {
 
   @POST
   @Path("/{clusterName}/sources")
-  public BaragonGroup addSource(@PathParam("clusterName") String clusterName, @QueryParam("source") String source) {
-    return loadBalancerDatastore.addSourceToGroup(clusterName, source);
+  public BaragonGroup addSource(@PathParam("clusterName") String clusterName, @QueryParam("source") String source, @QueryParam("port") int port) {
+    return loadBalancerDatastore.addSourceToGroup(clusterName, source, port);
   }
 
   @DELETE

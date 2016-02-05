@@ -2,6 +2,8 @@ package com.hubspot.baragon.data;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.curator.framework.CuratorFramework;
@@ -87,14 +89,16 @@ public class BaragonLoadBalancerDatastore extends AbstractDataStore {
   }
 
   @Timed
-  public BaragonGroup addSourceToGroup(String name, String source) {
+  public BaragonGroup addSourceToGroup(String name, String source, int port) {
     Optional<BaragonGroup> maybeGroup = getLoadBalancerGroup(name);
     BaragonGroup group;
     if (maybeGroup.isPresent()) {
       group = maybeGroup.get();
-      group.addSource(source);
+      group.addSource(source, port);
     } else {
-      group = new BaragonGroup(name, Optional.<String>absent(), Sets.newHashSet(source));
+      Map<String, Integer> sources = new HashMap<String, Integer>();
+      sources.put(source, port);
+      group = new BaragonGroup(name, Optional.<String>absent(), sources);
     }
     writeToZk(String.format(LOAD_BALANCER_GROUP_FORMAT, name), group);
     return group;
@@ -120,7 +124,7 @@ public class BaragonLoadBalancerDatastore extends AbstractDataStore {
       group = maybeGroup.get();
       group.setDomain(domain);
     } else {
-      group = new BaragonGroup(name, domain, Collections.<String>emptySet());
+      group = new BaragonGroup(name, domain, new HashMap<String, Integer>());
     }
     writeToZk(String.format(LOAD_BALANCER_GROUP_FORMAT, name), group);
   }
