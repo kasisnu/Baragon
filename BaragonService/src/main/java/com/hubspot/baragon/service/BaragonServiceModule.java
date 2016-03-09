@@ -6,6 +6,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.amazonaws.regions.Region;
+import com.amazonaws.regions.Regions;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.framework.recipes.leader.LeaderLatch;
@@ -199,11 +201,16 @@ public class BaragonServiceModule extends AbstractModule {
   @Provides
   @Named(BARAGON_AWS_ELB_CLIENT)
   public AmazonElasticLoadBalancingClient providesAwsElbClient(Optional<ElbConfiguration> configuration) {
+    AmazonElasticLoadBalancingClient client;
     if (configuration.isPresent() && configuration.get().getAwsAccessKeyId() != null && configuration.get().getAwsAccessKeySecret() != null) {
-      return new AmazonElasticLoadBalancingClient(new BasicAWSCredentials(configuration.get().getAwsAccessKeyId(), configuration.get().getAwsAccessKeySecret()));
+      client = new AmazonElasticLoadBalancingClient(new BasicAWSCredentials(configuration.get().getAwsAccessKeyId(), configuration.get().getAwsAccessKeySecret()));
     } else {
-      return new AmazonElasticLoadBalancingClient();
+      client = new AmazonElasticLoadBalancingClient();
     }
+
+    Region region = Region.getRegion(Regions.fromName(configuration.get().getAwsRegion()));
+    client.setRegion(region);
+    return client;
   }
 
   @Singleton
